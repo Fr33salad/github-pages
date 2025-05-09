@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Instaprompt Marketplace SPA</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
+<!-- JSZip (offline cached by service-worker) -->
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}
+body{display:flex;flex-direction:column;min-height:100vh;background:#fafafa;color:#222}
+header,footer{padding:1rem;background:#111;color:#fff;text-align:center}
+main{flex:1;padding:1rem}
+h1{font-size:1.5rem;margin-bottom:.25rem}
+button,input,select,textarea{font-size:1rem}button{cursor:pointer}
+.navbar{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:space-between;align-items:center}
+.balance{background:#ffd500;color:#111;padding:.35rem .6rem;border-radius:4px;margin-left:.5rem}
+#langSelect{padding:.25rem;border-radius:4px}
+.grid{display:grid;gap:1rem}@media(min-width:768px){.grid{grid-template-columns:repeat(4,1fr)}}@media(max-width:767px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:480px){.grid{grid-template-columns:repeat(2,1fr)}}
+.card{background:#fff;padding:1rem;border-radius:8px;box-shadow:0 2px 6px rgba(0,0,0,.1);display:flex;flex-direction:column}
+.card h3{margin-bottom:.5rem}.price{font-weight:bold;margin:.5rem 0}.btn{margin-top:auto;padding:.6rem;border:none;border-radius:4px;background:#222;color:#fff}
+.penny{background:#e0fbe0}.value{background:#e0f0fb}.training{background:#e0e7ff}.business{background:#f0e0fb}.pro{background:#fff4e0}.premium{background:#fde0e0}.crown{background:#fffbe0}
+.filter-bar{display:flex;flex-wrap:wrap;margin-bottom:1rem}
+.filter-bar button{margin:.25rem;padding:.6rem .9rem;border:none;border-radius:4px;background:#ddd}
+.filter-bar button.active{background:#555;color:#fff}
+section{margin-top:2rem}.badge{display:inline-block;background:#222;color:#fff;padding:.3rem .6rem;border-radius:4px;font-size:.85rem;margin-top:.5rem}
+.tier-grid{display:grid;gap:1rem}@media(min-width:600px){.tier-grid{grid-template-columns:repeat(3,1fr)}}
+.tier-card{padding:1rem;border-radius:8px;color:#fff;text-align:center;position:relative}
+.tier-card button{margin-top:1rem;padding:.6rem 1.2rem;border:none;border-radius:4px;background:#fff;color:#222}
+.tier-card.current::after{content:'Current';position:absolute;top:.5rem;right:.5rem;font-size:.7rem;background:#fff;color:#222;padding:.1rem .4rem;border-radius:3px}
+.free{background:#6c757d}.tier-pro{background:#ff9f43}.tier-premium{background:#ff6b6b}
+#sellerPortal{display:none}#sellerPortal.active{display:block}#sellerPortal form{display:grid;gap:.8rem;margin-top:1rem}
+.analytics{margin-top:1.2rem;border-top:1px solid #ccc;padding-top:.7rem;font-size:.9rem}
+.analytics table{width:100%;border-collapse:collapse}.analytics th,.analytics td{padding:.3rem .5rem;border-bottom:1px solid #eee;text-align:left}
+.bar{height:.55rem;background:#4caf50;border-radius:3px}
+.modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6)}
+.modal-content{background:#fff;width:90%;max-width:520px;max-height:90vh;overflow:auto;padding:1rem;border-radius:8px;position:relative}
+.close{position:absolute;top:.5rem;right:.6rem;border:none;background:none;font-size:1.35rem;cursor:pointer}
+textarea{width:100%;height:90px;margin-top:.6rem;padding:.6rem}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+@media print{header,.filter-bar,#walletSection,#tiersSection,#sellerBtn,.btn-print,.btn-download,#srcBundleBtn,.close,.navbar{display:none}.print-include{display:block}}
+</style>
+</head>
+<body>
+<header>
+  <div class="navbar">
+    <div><h1 id="h1">Instaprompt Marketplace</h1><small id="sub">Discover &amp; Trade GPT Prompts</small></div>
+    <div style="display:flex;align-items:center;gap:.5rem"><select id="langSelect"></select><button id="historyBtn">History</button><button id="sellerBtn">Seller</button><span id="balChip" class="balance">$0.00</span></div>
+  </div>
+</header>
+<main>
+  <div id="filterBar" class="filter-bar"></div><div id="grid" class="grid" aria-live="polite"></div>
+  <section id="walletSection"><h2 id="walleth2">Get Your QOIN</h2><input id="handle" placeholder="Enter name/handle"><button id="regBtn">Register</button><button id="addBtn">Add Credits</button><div id="qoinBox"></div></section>
+  <section id="tiersSection"><h2 id="tierh2">Seller Upgrades</h2><div id="tierGrid" class="tier-grid"></div></section>
+  <section id="sellerPortal"><h2 id="sellerh2">Prompt Uploader</h2><form id="upForm"><input id="sTitle" placeholder="Title" required><select id="sCat" required><option value="" disabled selected>Category</option><option>Penny</option><option>Value</option><option>Training</option><option>Business</option></select><input id="sPrice" type="number" step="0.01" placeholder="Price" required><textarea id="sDesc" placeholder="Short description" required></textarea><textarea id="sPrompt" placeholder="Raw prompt text" required></textarea><button type="submit">Save Prompt</button></form><div id="analytics" class="analytics"></div></section>
+  <div style="margin-top:2rem"><button class="btn-print">Print to PDF</button><button class="btn-download">Download System JSON</button><button id="srcBundleBtn">Download Source Bundle</button><a href="#" id="agreementLink">Iron Mask QOIN Agreement</a></div>
+</main>
+<footer><p>&copy; 2025 Instaprompt</p></footer>
+<div id="modal" class="modal"><div class="modal-content"><button class="close" id="mClose">&times;</button><h3 id="mTitle"></h3><p id="mDesc"></p><p><strong id="priceLbl">Price:</strong> <span id="mPrice"></span></p><textarea id="outBox" readonly></textarea><button id="runBtn">Run Prompt</button><button id="dlJsonBtn">Download Prompt JSON</button></div></div>
+<div id="historyModal" class="modal"><div class="modal-content"><button class="close" id="hClose">&times;</button><h3 id="histH3">Purchase History</h3><textarea id="histArea" readonly></textarea></div></div>
+<div id="legalModal" class="modal"><div class="modal-content"><button class="close" id="lClose">&times;</button><h3 id="legalH3">Iron Mask QOIN Agreement (v<span id="lVer"></span>)</h3><div id="legalBody" style="max-height:55vh;overflow:auto;margin:.8rem 0"></div><button id="agreeBtn">I Agree</button></div></div>
+<div id="printLegal" class="print-include"></div>
+<script id="manifest" type="application/json">{"name":"Instaprompt","short_name":"Instaprompt","start_url":".","display":"standalone","background_color":"#111","theme_color":"#111","icons":[]}</script>
+<script>
+const LEGAL_VERSION="1.0.0";
+const LEGAL_HTML=`<p>This Iron Mask QOIN Agreement (“Agreement”) governs your use of Instaprompt tokens (“QOINs”).</p><ol><li>You receive a non-transferable license to execute prompts for personal use.</li><li>No resale or public redistribution without Premium-tier permission.</li><li>Seller is liable for prompt content.</li><li>Disputes resolved by arbitration in California.</li></ol><p>© 2025 Instaprompt Consortium.</p>`;
+const I18N={en:{l:"English",ui:{title:"Instaprompt Marketplace",sub:"Discover & Trade GPT Prompts",wallet:"Get Your QOIN",tiers:"Seller Upgrades",seller:"Prompt Uploader",price:"Price:",history:"Purchase History",btnHist:"History",btnSell:"Seller",legalOK:"I Agree"}},es:{l:"Español",ui:{title:"Mercado Instaprompt",sub:"Descubre y comercia prompts GPT",wallet:"Obtén tu QOIN",tiers:"Planes de vendedor",seller:"Cargador de Prompts",price:"Precio:",history:"Historial de compras",btnHist:"Historial",btnSell:"Vendedor",legalOK:"Acepto"}}};
+const LS=(k,v)=>v===undefined?JSON.parse(localStorage.getItem(k)):localStorage.setItem(k,JSON.stringify(v));
+if(!LS("lang"))LS("lang",(navigator.language||"en").slice(0,2));
+if(!LS("balance"))LS("balance",0);
+if(!LS("tier"))LS("tier","Free");
+if(!LS("stats"))LS("stats",{});
+if(!LS("products"))LS("products",[]);
+if(!LS("execLog"))LS("execLog",[]);
+if(!LS("legalConsent")||LS("legalConsent").version!==LEGAL_VERSION)LS("legalConsent",null);
+const colors={Penny:"#e0fbe0",Value:"#e0f0fb",Training:"#e0e7ff",Business:"#f0e0fb",Pro:"#fff4e0",Premium:"#fde0e0",Crown:"#fffbe0"};
+const tiers=[{name:"Free",limit:3,b:"70/30",c:"free"},{name:"Pro",limit:25,b:"80/20",c:"tier-pro"},{name:"Premium",limit:1/0,b:"90/10",c:"tier-premium"}];
+const base=[{id:1,title:"Cold Email Wizard",category:"Business",tier:"Pro",d:"Template for cold emails.",p:19.99,plain:"Write a cold email ..."},
+{id:2,title:"Micro-SaaS Idea Generator",category:"Training",tier:"Penny",d:"Generates 100 SaaS ideas.",p:1.99,plain:"Suggest micro-SaaS ideas ..."},
+{id:3,title:"Brand Voice Styleguide",category:"Business",tier:"Premium",d:"Craft a brand tone.",p:49.99,plain:"Create a brand style guide ..."}];
+let keyPr;const getKey=()=>keyPr?keyPr:(keyPr=crypto.subtle.generateKey({name:"AES-GCM",length:256},!1,["encrypt","decrypt"]));
+const enc=async t=>{const iv=crypto.getRandomValues(new Uint8Array(12)),c=await crypto.subtle.encrypt({name:"AES-GCM",iv},await getKey(),new TextEncoder().encode(t));return{c:btoa(String.fromCharCode(...new Uint8Array(c))),v:btoa(String.fromCharCode(...iv))}};
+const dec=async(o,i)=>new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:Uint8Array.from(atob(i),c=>c.charCodeAt(0))},await getKey(),Uint8Array.from(atob(o),c=>c.charCodeAt(0))));
+let db;indexedDB.open("ip-ledger",1).onupgradeneeded=e=>e.target.result.createObjectStore("ledger",{keyPath:"id",autoIncrement:!0});
+indexedDB.open("ip-ledger",1).onsuccess=e=>db=e.target.result;
+const addLed=o=>db&&db.transaction("ledger","readwrite").objectStore("ledger").add(o);
+const getLed=()=>new Promise(r=>{const a=[];db.transaction("ledger").objectStore("ledger").openCursor().onsuccess=e=>{const c=e.target.result;c?(a.push(c.value),c.continue()):r(a)}});
+
+const withinHr=t=>Date.now()-t<36e5;
+const execOK=o=>{const l=LS("execLog").filter(x=>withinHr(x.ts));LS("execLog",l);return o?l.filter(x=>x.owner).length<60:l.filter(x=>!x.owner).length<120};
+const logExec=o=>{const l=LS("execLog");l.push({ts:Date.now(),owner:o});LS("execLog",l)};
+
+const stats=LS("stats");let prods=[];const load=async()=>{const e=await Promise.all(base.map(async p=>{const {c,v}=await enc(p.plain);return{...p,cipher:c,iv:v}}));prods=[...e,...LS("products")];renderAll();};
+load();
+
+const langSel=document.getElementById("langSelect");for(const c in I18N){const o=document.createElement("option");o.value=c;o.textContent=I18N[c].l;langSel.appendChild(o)}langSel.value=LS("lang");
+langSel.onchange=()=>{LS("lang",langSel.value);applyLocale()};
+const txt=k=>I18N[LS("lang")].ui[k]||k;
+function applyLocale(){h1.textContent=txt("title");sub.textContent=txt("sub");walleth2.textContent=txt("wallet");tierh2.textContent=txt("tiers");sellerh2.textContent=txt("seller");historyBtn.textContent=txt("btnHist");sellerBtn.textContent=txt("btnSell");priceLbl.textContent=txt("price");histH3.textContent=txt("history");legalH3.firstChild.textContent=I18N[LS("lang")].ui.legalTitle+" (v";agreeBtn.textContent=txt("legalOK");}
+applyLocale();
+
+function updBal(){balChip.textContent=`$${(+LS("balance")).toFixed(2)}`;}updBal();
+
+function filtRender(){filterBar.textContent="";["All",...new Set(prods.map(p=>p.category))].forEach(cat=>{const b=document.createElement("button");b.textContent=cat;cat==="All"&&b.classList.add("active");b.onclick=()=>{filterBar.querySelectorAll("button").forEach(x=>x.classList.remove("active"));b.classList.add("active");prodRender(cat==="All"?prods:prods.filter(p=>p.category===cat))};filterBar.appendChild(b)})}
+function prodRender(list){grid.textContent="";list.forEach(p=>{const c=document.createElement("div");c.className="card";c.style.background=colors[p.tier]||"#fff";c.innerHTML=`<h3>${p.title}</h3><p>${p.d}</p><p class="price">$${p.p.toFixed(2)}</p><button class="btn" data-id="${p.id}">View</button>`;grid.appendChild(c)})}
+function tierRender(){tierGrid.textContent="";const cur=LS("tier");tiers.forEach(t=>{const c=document.createElement("div");c.className=`tier-card ${t.c} ${t.name===cur?"current":""}`;c.innerHTML=`<h3>${t.name}</h3><p>${t.limit===1/0?"Unlimited":t.limit+" prompts"}</p><p>Rev Split: ${t.b}</p><button>Upgrade</button>`;c.querySelector("button").onclick=()=>{LS("tier",t.name);tierRender();alert("Upgraded to "+t.name)};tierGrid.appendChild(c)})}
+function anaRender(){analytics.textContent="";const mine=prods.filter(p=>p.owner);if(!mine.length){analytics.textContent="No uploaded prompts.";return}const t=document.createElement("table");t.innerHTML="<tr><th>Title</th><th>Views</th><th>Runs</th><th></th></tr>";mine.forEach(p=>{const s=stats[p.id]||{v:0,r:0};const r=document.createElement("tr");r.innerHTML=`<td>${p.title}</td><td>${s.v}</td><td>${s.r}</td><td><div class="bar" style="width:${Math.min(s.r*10,100)}%"></div></td>`;t.appendChild(r)});analytics.appendChild(t)}
+function incStat(id,k){stats[id]=stats[id]||{v:0,r:0};stats[id][k]++;LS("stats",stats);anaRender()}
+function renderAll(){filtRender();prodRender(prods);tierRender();anaRender()}
+
+grid.onclick=e=>{if(e.target.dataset.id){showModal(+e.target.dataset.id)}};
+function showModal(id){const p=prods.find(x=>x.id===id);mTitle.textContent=p.title;mDesc.textContent=p.d;mPrice.textContent=`$${p.p.toFixed(2)}`;outBox.value="";modal.style.display="flex";incStat(id,"v");current=p;}
+mClose.onclick=()=>{modal.style.display="none"};
+let current;
+
+regBtn.onclick=()=>{const h=handle.value.trim();if(!h)return alert("Enter handle");const q=`QOIN-${h.toUpperCase()}-${Date.now()}`;LS("qoin",q);if(+LS("balance")===0){LS("balance",10);updBal()}qoinBox.innerHTML=`<span class="badge">$10 Spin Token: ${q}</span>`};
+addBtn.onclick=()=>{const a=parseFloat(prompt("Add credits (USD)"));if(!isFinite(a)||a<=0)return;LS("balance",+LS("balance")+a);updBal()};
+
+runBtn.onclick=async()=>{if(!LS("legalConsent")){showLegal();return}if(!execOK(!!current.owner))return alert("Rate limit—try later");const bal=+LS("balance");if(bal<current.p)return alert("Insufficient balance");const txt=await dec(current.cipher,current.iv);outBox.value=`>>> ${current.title}\n${txt.slice(0,64)}...\n— ${LS("qoin")||"ANON"}`;LS("balance",bal-current.p);updBal();addLed({time:Date.now(),product:current.title,price:current.p});incStat(current.id,"r");logExec(!!current.owner)};
+dlJsonBtn.onclick=()=>{const blob=new Blob([JSON.stringify({title:current.title,cipher:current.cipher,iv:current.iv},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=current.title.replace(/\s+/g,"_")+".json";a.click()};
+
+historyBtn.onclick=async()=>{const rows=await getLed();histArea.value=rows.map(r=>new Date(r.time).toLocaleString()+" | "+r.product+" | $"+r.price).join("\n")||"No purchases.";historyModal.style.display="flex"};
+hClose.onclick=()=>historyModal.style.display="none";
+
+const showLegal=()=>{lVer.textContent=LEGAL_VERSION;legalBody.innerHTML=LEGAL_HTML;printLegal.innerHTML=`<h3>Iron Mask QOIN Agreement (v${LEGAL_VERSION})</h3>${LEGAL_HTML}`;legalModal.style.display="flex"};
+agreementLink.onclick=e=>{e.preventDefault();showLegal()};
+agreeBtn.onclick=async()=>{const ts=Date.now();const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(LS("qoin")+LEGAL_VERSION+ts));LS("legalConsent",{version:LEGAL_VERSION,timestamp:ts,hash:Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("")});addLed({time:ts,product:"LEGAL_CONSENT",price:0,version:LEGAL_VERSION});legalModal.style.display="none";alert("Agreement accepted—run your purchase again.")};
+lClose.onclick=()=>legalModal.style.display="none";
+
+sellerBtn.onclick=()=>sellerPortal.classList.toggle("active");
+upForm.onsubmit=async e=>{e.preventDefault();const tier=tiers.find(t=>t.name===LS("tier"));if(prods.filter(p=>p.owner).length>=tier.limit){alert("Prompt limit reached");return}const {c, v}=await enc(sPrompt.value);const n={id:Date.now(),title:sTitle.value,category:sCat.value,tier:LS("tier"),d:sDesc.value,p:+sPrice.value,owner:!0,cipher:c,iv:v};const store=LS("products");store.push(n);LS("products",store);prods.push(n);upForm.reset();renderAll();alert("Prompt saved")};
+
+document.querySelector(".btn-download").onclick=()=>{const blob=new Blob([JSON.stringify({products:prods,stats,consent:LS("legalConsent")},null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="system_map.json";a.click()};
+
+srcBundleBtn.onclick=async()=>{const zip=new JSZip();zip.file("index.html","<!-- snapshot "+new Date().toISOString()+" -->\n"+document.documentElement.outerHTML);zip.file("system_map.json",JSON.stringify({products:prods,stats,consent:LS("legalConsent")},null,2));zip.file("__tests__/wallet.test.js",`const {JSDOM}=require("jsdom");test("register seeds $10",()=>{const dom=new JSDOM(require("fs").readFileSync("index.html","utf8"),{runScripts:"dangerously"});const w=dom.window;w.document.getElementById("handle").value="alice";w.document.getElementById("regBtn").click();expect(w.localStorage.getItem("balance")).toBe("10");});`);zip.file("cypress/e2e/register.cy.js",`describe("Register",()=>{it("creates token and balance",()=>{cy.visit("index.html");cy.get("#handle").type("bob");cy.contains("Register").click();cy.contains("$10 Spin Token").should("exist");cy.get("#balChip").should("contain","$10.00");});});`);zip.file(".github/workflows/ci.yml",`name:CI\non:[push]\njobs:\n  test:\n    runs-on:ubuntu-latest\n    steps:\n      - uses:actions/checkout@v4\n      - uses:actions/setup-node@v4\n        with:{node-version:"20"}\n      - run:npm i jest jsdom\n      - run:npx jest`);const blob=await zip.generateAsync({type:"blob"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="instaprompt_source_bundle.zip";a.click()};
+
+document.querySelector(".btn-print").onclick=()=>window.print();
+
+const swCode=`const CACHE="ip-cache-v1";self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(["./","https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"]))));self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))))`;
+if("serviceWorker"in navigator){const mf=URL.createObjectURL(new Blob([document.getElementById("manifest").textContent],{type:"application/manifest+json"}));document.head.appendChild(Object.assign(document.createElement("link"),{rel:"manifest",href:mf}));navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode],{type:"text/javascript"})))}
+</script>
+</body>
+</html>
